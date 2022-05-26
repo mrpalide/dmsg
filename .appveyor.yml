@@ -70,4 +70,4 @@ for:
     before_deploy:
       - bash ./docker/scripts/docker-push.sh -t "$APPVEYOR_REPO_BRANCH" -p
     deploy_script:
-      - echo "Complete!"
+      - echo "Complete!!"
