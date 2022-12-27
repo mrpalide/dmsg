@@ -1,3 +1,4 @@
+// Package noise pkg/noise/read_write.go
 package noise
 
 import (
@@ -20,7 +21,7 @@ const MaxWriteSize = maxPayloadSize
 
 // Frame format: [ len (2 bytes) | auth & nonce (24 bytes) | payload (<= maxPayloadSize bytes) ]
 const (
-	maxFrameSize   = 4096                                 // maximum frame size (4096)
+	maxFrameSize   = 65536                                // maximum frame size (4096)
 	maxPayloadSize = maxFrameSize - prefixSize - authSize // maximum payload size
 	maxPrefixValue = maxFrameSize - prefixSize            // maximum value contained in the 'len' prefix
 

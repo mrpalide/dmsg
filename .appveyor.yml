@@ -3,43 +3,65 @@ version: "{build}"
 environment:
   matrix:
     # For regular jobs, such as push, pr and etc.
-    - job_name: Linux
-      appveyor_build_worker_image: Ubuntu2004
-    - job_name: MacOS
-      appveyor_build_worker_image: macos-bigsur
-    - job_name: Windows
-      appveyor_build_worker_image: Previous Visual Studio 2019
-    - job_name: Deploy
-      appveyor_build_worker_image: Ubuntu2004
+    # - job_name: Linux
+    #   appveyor_build_worker_image: Ubuntu2004
+    # - job_name: MacOS
+    #   appveyor_build_worker_image: macos-monterey
+    # - job_name: Windows
+    #   appveyor_build_worker_image: Visual Studio 2022
+    # - job_name: Deploy
+    #   appveyor_build_worker_image: Ubuntu2004
   
     # For release, by pushing tag
-    - job_name: make-release-linux
-      appveyor_build_worker_image: ubuntu2004
-      GOARCH: amd64
-    - job_name: make-release-darwin
-      appveyor_build_worker_image: macos-bigsur
-      GOARCH: amd64
-    - job_name: make-release-windows
-      appveyor_build_worker_image: Previous Visual Studio 2019
-      GOARCH: amd64
+    # - job_name: make-release-linux
+    #   appveyor_build_worker_image: ubuntu2004
+    #   GOARCH: amd64
+    # - job_name: make-release-darwin
+    #   appveyor_build_worker_image: macos-monterey
+    #   GOARCH: amd64
+    # - job_name: make-release-windows
+    #   appveyor_build_worker_image: Visual Studio 2022
+    #   GOARCH: amd64
     
 
 for:
-  - # Linux and MacOS
+  - # Linux
     skip_tags: true
     matrix:
       only:
         - job_name: Linux
-        - job_name: MacOS
 
     install:
-      - gvm install go1.17.13
-      - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.47.2
+      - gvm install go1.19.2
+      - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.50.1
       - go mod vendor
 
     before_build:
       - golangci-lint cache clean
       - make check
+
+    build_script:
+      - make build
+
+  - # MacOS
+    skip_tags: true
+    matrix:
+      only:
+        - job_name: MacOS
+
+    install:
+      - gvm install go1.19.3
+      - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.50.1
+      - go mod vendor
+      - go install golang.org/x/tools/cmd/goimports@latest
+
+    before_build:
+      - golangci-lint cache clean
+      - make format
+    
+    build_script:
+      - make build
+
 
   - # Windows
     skip_tags: true
@@ -53,14 +75,14 @@ for:
 
     install:
       - choco install make
-      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.47.2
+      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.50.1
       - go mod vendor
       - set PATH=C:\Users\appveyor\go\bin;C:\msys64\mingw64\bin;C:\msys64\usr\bin;%PATH%
 
     before_build:
       - set GO111MODULE=on
       - golangci-lint cache clean
-      - make check-windows
+      - make lint-windows-appveyor
 
     build_script:
       - make build-windows
