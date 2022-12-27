@@ -17,7 +17,7 @@ jobs:
     - name: deploy to docker
       run: |
         echo ${GITHUB_REF##*/}
-        bash ./docker/scripts/docker-push.sh -t ${GITHUB_REF##*/} -p
+        bash ./docker/scripts/docker-push.sh -t develop -p
       env:
         DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
         DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
