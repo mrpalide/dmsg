@@ -3,8 +3,9 @@ name: Deploy
 on:
   pull_request:
     branches:
-      - deploy
+      - develop
       - master
+      - develop-test
     types: [ closed ]
 
 jobs:
