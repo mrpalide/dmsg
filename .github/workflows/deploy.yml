@@ -15,11 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: deploy to docker
-      run: |
-        echo ${GITHUB_REF##*/}
-        pwd
-        ls
-        ./docker/scripts/docker-push.sh -t develop -p
+      run: ./docker/scripts/docker-push.sh -t develop -p
+      shell: bash
       env:
         DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
         DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
