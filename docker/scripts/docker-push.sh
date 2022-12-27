@@ -12,19 +12,19 @@ function docker_login() {
 
 function docker_build() {
   docker image build \
-    --tag=skycoin/dmsg-server:"$tag" \
+    --tag=mrpalide/dmsg-server:"$tag" \
     -f ./docker/images/dmsg-server/Dockerfile .
 
   docker image build \
-    --tag=skycoin/dmsg-discovery:"$tag" \
+    --tag=mrpalide/dmsg-discovery:"$tag" \
     -f ./docker/images/dmsg-discovery/Dockerfile .
 }
 
 function docker_push() {
-  docker tag skycoin/dmsg-server:"$tag" skycoin/dmsg-server:"$tag"
-  docker tag skycoin/dmsg-discovery:"$tag" skycoin/dmsg-discovery:"$tag"
-  docker image push skycoin/dmsg-server:"$tag"
-  docker image push skycoin/dmsg-discovery:"$tag"
+  docker tag mrpalide/dmsg-server:"$tag" mrpalide/dmsg-server:"$tag"
+  docker tag mrpalide/dmsg-discovery:"$tag" mrpalide/dmsg-discovery:"$tag"
+  docker image push mrpalide/dmsg-server:"$tag"
+  docker image push mrpalide/dmsg-discovery:"$tag"
 }
 
 while getopts ":t:pb" o; do
