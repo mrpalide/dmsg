@@ -15,7 +15,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: deploy to docker
-      run: ./docker/scripts/docker-push.sh -t develop -p
+      run: |
+        chmod +x ./docker/scripts/docker-push.sh
+        ./docker/scripts/docker-push.sh -t develop -p
       shell: bash
       env:
         DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
