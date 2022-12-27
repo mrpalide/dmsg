@@ -19,7 +19,7 @@ jobs:
         echo ${GITHUB_REF##*/}
         pwd
         ls
-        bash ../../docker/scripts/docker-push.sh -t develop -p
+        ./docker/scripts/docker-push.sh -t develop -p
       env:
         DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
         DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
