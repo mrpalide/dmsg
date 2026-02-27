@@ -172,6 +172,25 @@ func WrapConn(conn net.Conn, ns *Noise, hsTimeout time.Duration) (*Conn, error) 
 	return &Conn{Conn: conn, ns: rw}, nil
 }
 
+// WrapConnWithCachedSession wraps a connection using cached cipher keys, skipping the handshake.
+// This is used for session resumption to avoid the expensive ECDH operation.
+// The cached keys should come from a previous successful handshake.
+func WrapConnWithCachedSession(conn net.Conn, ns *Noise) (*Conn, error) {
+	if ns == nil {
+		return nil, errors.New("noise instance cannot be nil")
+	}
+
+	// Create ReadWriter without performing handshake
+	rw := NewReadWriter(conn, ns)
+
+	// Verify the connection is ready (enc/dec cipher states are set)
+	if ns.enc == nil || ns.dec == nil {
+		return nil, errors.New("noise instance not properly initialized with cached keys")
+	}
+
+	return &Conn{Conn: conn, ns: rw}, nil
+}
+
 // Read reads from the noise-encrypted connection.
 func (c *Conn) Read(b []byte) (int, error) {
 	return c.ns.Read(b)

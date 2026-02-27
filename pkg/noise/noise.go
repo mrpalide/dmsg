@@ -6,6 +6,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"reflect"
+	"unsafe"
 
 	"github.com/skycoin/noise"
 	"github.com/skycoin/skywire/pkg/skywire-utilities/pkg/cipher"
@@ -176,4 +178,142 @@ func (ns *Noise) DecryptWithNonceMap(nm NonceMap, ciphertext []byte) ([]byte, er
 		return nil, fmt.Errorf("received decryption nonce (%d) is repeated", recvSeq)
 	}
 	return ns.dec.Cipher().Decrypt(nil, recvSeq, nil, ciphertext[nonceSize:])
+}
+
+// GetCipherKeys extracts the derived cipher keys from a completed Noise handshake.
+// This should only be called after HandshakeFinished() returns true.
+// Returns (encKey, decKey, error) where each key is 32 bytes.
+// Uses reflection to access private key fields in noise.CipherState.
+func (ns *Noise) GetCipherKeys() ([]byte, []byte, error) {
+	if ns.enc == nil || ns.dec == nil {
+		return nil, nil, errors.New("handshake not completed")
+	}
+
+	// Use reflection to access the private 'k' field ([32]byte key)
+	encKey := extractCipherStateKey(ns.enc)
+	decKey := extractCipherStateKey(ns.dec)
+
+	if len(encKey) != 32 || len(decKey) != 32 {
+		return nil, nil, fmt.Errorf("invalid cipher key length: enc=%d, dec=%d", len(encKey), len(decKey))
+	}
+
+	// Return copies to prevent mutation
+	return append([]byte(nil), encKey...), append([]byte(nil), decKey...), nil
+}
+
+// NewNoiseFromCachedKeys creates a Noise instance from cached cipher keys.
+// This skips the expensive ECDH handshake by reusing previously derived keys.
+// Nonces are always reset to 0 for each new connection (critical for security).
+func NewNoiseFromCachedKeys(config Config, encKey, decKey []byte) (*Noise, error) {
+	if len(encKey) != 32 || len(decKey) != 32 {
+		return nil, fmt.Errorf("invalid cipher key length: enc=%d, dec=%d (expected 32)", len(encKey), len(decKey))
+	}
+
+	// Create a temporary Noise instance to get the cipher suite
+	nc := noise.Config{
+		CipherSuite: noise.NewCipherSuite(Secp256k1{}, noise.CipherChaChaPoly, noise.HashSHA256),
+		Random:      rand.Reader,
+		Pattern:     noise.HandshakeKK,
+		Initiator:   config.Initiator,
+		StaticKeypair: noise.DHKey{
+			Public:  config.LocalPK[:],
+			Private: config.LocalSK[:],
+		},
+	}
+
+	// Create cipher states with the cached keys
+	cs := nc.CipherSuite
+
+	// Convert []byte to [32]byte for Cipher() method
+	var encKeyArray, decKeyArray [32]byte
+	copy(encKeyArray[:], encKey)
+	copy(decKeyArray[:], decKey)
+
+	encCipher := cs.Cipher(encKeyArray)
+	decCipher := cs.Cipher(decKeyArray)
+
+	encState := &noise.CipherState{}
+	decState := &noise.CipherState{}
+
+	// Use reflection to set private fields
+	setCipherStateFields(encState, cs, encCipher, encKey)
+	setCipherStateFields(decState, cs, decCipher, decKey)
+
+	return &Noise{
+		pk:       config.LocalPK,
+		sk:       config.LocalSK,
+		init:     config.Initiator,
+		pattern:  noise.HandshakeKK, // Always KK for cached sessions
+		hs:       nil,                // No handshake state needed
+		enc:      encState,
+		dec:      decState,
+		encNonce: 0, // Always start at 0 for new connection
+		decNonce: 0, // Always start at 0 for new connection
+	}, nil
+}
+
+// extractCipherStateKey uses reflection to extract the private 'k' field from noise.CipherState.
+// CipherState structure: {cs CipherSuite, c Cipher, k [32]byte, n uint64}
+func extractCipherStateKey(cs *noise.CipherState) []byte {
+	if cs == nil {
+		return nil
+	}
+
+	// Use reflection to access the private 'k' field
+	csValue := reflect.ValueOf(cs).Elem()
+	kField := csValue.FieldByName("k")
+
+	if !kField.IsValid() {
+		noiseLogger.Error("Failed to access CipherState 'k' field")
+		return nil
+	}
+
+	// Get the [32]byte array
+	var key [32]byte
+
+	// Use unsafe to read the private field
+	kFieldPtr := unsafe.Pointer(kField.UnsafeAddr())
+	key = *(*[32]byte)(kFieldPtr)
+
+	return key[:]
+}
+
+// setCipherStateFields uses reflection to set private fields in noise.CipherState.
+// This is needed to create a CipherState from cached keys without going through handshake.
+func setCipherStateFields(cs *noise.CipherState, cipherSuite noise.CipherSuite, cipher noise.Cipher, key []byte) {
+	if cs == nil || len(key) != 32 {
+		return
+	}
+
+	csValue := reflect.ValueOf(cs).Elem()
+
+	// Set 'cs' field (CipherSuite)
+	csField := csValue.FieldByName("cs")
+	if csField.IsValid() {
+		reflect.NewAt(csField.Type(), unsafe.Pointer(csField.UnsafeAddr())).
+			Elem().Set(reflect.ValueOf(cipherSuite))
+	}
+
+	// Set 'c' field (Cipher)
+	cField := csValue.FieldByName("c")
+	if cField.IsValid() {
+		reflect.NewAt(cField.Type(), unsafe.Pointer(cField.UnsafeAddr())).
+			Elem().Set(reflect.ValueOf(cipher))
+	}
+
+	// Set 'k' field ([32]byte key)
+	kField := csValue.FieldByName("k")
+	if kField.IsValid() {
+		var keyArray [32]byte
+		copy(keyArray[:], key)
+		kFieldPtr := unsafe.Pointer(kField.UnsafeAddr())
+		*(*[32]byte)(kFieldPtr) = keyArray
+	}
+
+	// Set 'n' field (nonce counter) to 0
+	nField := csValue.FieldByName("n")
+	if nField.IsValid() {
+		reflect.NewAt(nField.Type(), unsafe.Pointer(nField.UnsafeAddr())).
+			Elem().SetUint(0)
+	}
 }
